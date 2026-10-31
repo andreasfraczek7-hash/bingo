@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bingo Hossa</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1a1a1a;--mut:#6b6b6b;--card:#f4f4f6;--bd:#d0d0d6;--ac:#8b1a2b;--ok:#1f8a4c;--er:#c0392b}
+@media (prefers-color-scheme:dark){:root{--bg:#16161a;--fg:#f0f0f2;--mut:#a0a0a8;--card:#22222a;--bd:#3a3a44;--ac:#e05a6d;--ok:#4cc380;--er:#ff6b5b}}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--fg);padding:16px;max-width:1000px;margin:auto}
+h1{text-align:center;margin:8px 0 4px;color:var(--ac)}
+p.sub{text-align:center;color:var(--mut);font-size:14px;margin:0 0 16px}
+input{width:100%;font-size:16px;padding:8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg)}
+button{font-size:16px;padding:10px 20px;border:0;border-radius:6px;background:var(--ac);color:#fff;cursor:pointer}
+#start{max-width:360px;margin:24px auto;display:flex;flex-direction:column;gap:12px}
+#bar{position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5}
+#prog{height:8px;background:var(--card);border-radius:4px;overflow:hidden}
+#fill{height:100%;width:0;background:var(--ok);transition:width .2s}
+#cnt{text-align:center;font-size:14px;color:var(--mut);margin-top:4px}
+#grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.c label{font-size:13px;font-weight:bold;text-align:center;flex:1}
+.c input{font-size:14px;padding:6px}
+.c.ok{border-color:var(--ok)}
+.c.dup input{border-color:var(--er)}
+.c.dup::after{content:"Ta osoba już jest wpisana";font-size:11px;color:var(--er);text-align:center}
+#win{display:none;text-align:center;background:var(--ok);color:#fff;border-radius:8px;padding:16px;margin:12px 0;font-size:18px}
+#msg{text-align:center;font-size:13px;margin-top:6px}
+@media (max-width:700px){#grid{grid-template-columns:1fr}.c label{text-align:left}}
+</style>
+</head>
+<body>
+<h1>BINGO</h1>
+<p class="sub">Wpisz w każdą kratkę imię i nazwisko osoby, do której pasuje opis. Jedna osoba może pojawić się tylko raz.</p>
+
+<div id="start">
+  <input id="me" placeholder="Twoje imię i nazwisko" autocomplete="name">
+  <button id="go">Zaczynamy</button>
+</div>
+
+<div id="game" style="display:none">
+  <div id="bar"><div id="prog"><div id="fill"></div></div><div id="cnt"></div></div>
+  <div id="win">BINGO! Twój wynik został wysłany.</div>
+  <div id="grid"></div>
+  <div id="msg"></div>
+</div>
+
+<script>
+// WKLEJ TUTAJ adres wdrożonej aplikacji Apps Script (kończy się na /exec)
+var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxX69c7vcz8xEj_3wMfWhHrFxpOVH-sXq3uajBz-QeA_Kf6KMMXPEofa6lT6DDgwVdRmw/exec";
+
+var Q = ["Mówi w 3 językach","Ma kota","Ma psa","Ma urodziny w tym miesiącu",
+"Ma w portfelu akcję spółki, która wypłaca dywidendę","Ma na sobie coś zielonego",
+"Przeczytał/a książkę w tym miesiącu","Był/a w tym roku w teatrze","Potrafi grać na instrumencie",
+"Zdał/a statystykę na 5","Jest w Hossie ponad 2 lata","Jest na drugim stopniu studiów",
+"Ma LinkedIna","Przeczytał/a „Inwestycje” Jajugi","Był/a na AWP",
+"Napisał/a „debiut studencki”","Potrafi zrobić wycenę DCF",
+"Rozpoczął/ęła swoją przygodę z giełdą od zakupu pojedynczych akcji zamiast ETF-u",
+"Był/a w kinie w tym tygodniu","Ma zielone oczy","Jest z Wrocławia","Inwestuje od min. 3 lat",
+"Ma na sobie logo Hossy","Ma obligacje","Ma krypto"];
+
+var KEY = "bingo_hossa_v1";
+var S = null;
+function load(){try{S = JSON.parse(localStorage.getItem(KEY));}catch(e){S=null}}
+function save(){try{localStorage.setItem(KEY, JSON.stringify(S));}catch(e){}}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
+function norm(s){return s.toLowerCase().replace(/\s+/g," ").trim()}
+
+function build(){
+  document.getElementById("start").style.display="none";
+  document.getElementById("game").style.display="block";
+  var g=document.getElementById("grid"); g.innerHTML="";
+  S.order.forEach(function(qi,pos){
+    var d=document.createElement("div"); d.className="c";
+    var l=document.createElement("label"); l.textContent=Q[qi]; l.htmlFor="f"+pos;
+    var inp=document.createElement("input"); inp.id="f"+pos; inp.placeholder="Imię i nazwisko";
+    inp.value=S.ans[pos]||""; inp.setAttribute("autocomplete","off");
+    inp.addEventListener("input",function(){S.ans[pos]=inp.value;save();check()});
+    d.appendChild(l); d.appendChild(inp); g.appendChild(d);
+  });
+  check();
+}
+
+function check(){
+  var cells=document.querySelectorAll(".c"), seen={}, filled=0, dups=0;
+  S.ans.forEach(function(v){var n=norm(v||"");if(n){seen[n]=(seen[n]||0)+1}});
+  cells.forEach(function(c,i){
+    var n=norm(S.ans[i]||"");
+    c.classList.toggle("ok",!!n && seen[n]===1);
+    c.classList.toggle("dup",!!n && seen[n]>1);
+    if(n && seen[n]===1) filled++;
+  });
+  document.getElementById("fill").style.width=(filled/25*100)+"%";
+  document.getElementById("cnt").textContent="Wypełnione: "+filled+" / 25";
+  if(filled===25){ finish(); }
+}
+
+function finish(){
+  document.getElementById("win").style.display="block";
+  if(S.sent) return;
+  var msg=document.getElementById("msg");
+  if(!SCRIPT_URL){msg.textContent="Brak adresu skryptu - wynik nie został wysłany.";return}
+  var body=new URLSearchParams({name:S.me,answers:S.ans.join(" | ")});
+  fetch(SCRIPT_URL,{method:"POST",mode:"no-cors",body:body}).then(function(){
+    S.sent=true;save();msg.textContent="Wysłano do organizatorów.";
+  }).catch(function(){msg.textContent="Nie udało się wysłać. Sprawdź internet - spróbujemy ponownie po zmianie dowolnego pola."});
+}
+
+document.getElementById("go").onclick=function(){
+  var n=document.getElementById("me").value.trim();
+  if(!n){document.getElementById("me").focus();return}
+  S={me:n,order:shuffle(Q.map(function(_,i){return i})),ans:[],sent:false};
+  save();build();
+};
+load(); if(S&&S.order&&S.order.length===25){build()}
+</script>
+</body>
+</html>
