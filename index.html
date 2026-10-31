@@ -44,6 +44,7 @@ button{font-size:16px;padding:10px 20px;border:0;border-radius:6px;background:va
   <div id="win">BINGO! Twój wynik został wysłany.</div>
   <div id="grid"></div>
   <div id="msg"></div>
+  <button id="sendbtn" style="display:block;margin:16px auto">Wyślij odpowiedzi</button>
 </div>
 
 <script>
@@ -114,6 +115,16 @@ document.getElementById("go").onclick=function(){
   save();build();
 };
 load(); if(S&&S.order&&S.order.length===25){build()}
+  document.getElementById("sendbtn").onclick=function(){
+  var f=document.createElement("form");
+  f.method="POST"; f.action=SCRIPT_URL; f.target="_blank";
+  [["name",S.me],["answers",S.ans.join(" | ")]].forEach(function(p){
+    var i=document.createElement("input");
+    i.type="hidden"; i.name=p[0]; i.value=p[1];
+    f.appendChild(i);
+  });
+  document.body.appendChild(f); f.submit(); f.remove();
+};
 </script>
 </body>
 </html>
